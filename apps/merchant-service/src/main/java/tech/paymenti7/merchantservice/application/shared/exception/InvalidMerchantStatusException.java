@@ -1,4 +1,4 @@
-package tech.paymenti7.merchantservice.merchant.application;
+package tech.paymenti7.merchantservice.application.shared.exception;
 
 public class InvalidMerchantStatusException extends RuntimeException {
 

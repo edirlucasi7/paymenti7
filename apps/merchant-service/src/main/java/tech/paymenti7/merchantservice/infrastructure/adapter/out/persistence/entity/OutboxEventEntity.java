@@ -1,4 +1,4 @@
-package tech.paymenti7.merchantservice.merchant.domain;
+package tech.paymenti7.merchantservice.infrastructure.adapter.out.persistence.entity;
 
 import java.time.Instant;
 import java.util.Map;
@@ -11,10 +11,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import tech.paymenti7.merchantservice.application.core.domain.OutboxEvent;
 
 @Entity
 @Table(name = "outbox_events")
-public class OutboxEvent {
+public class OutboxEventEntity {
 
 	@Id
 	private UUID id;
@@ -38,17 +39,17 @@ public class OutboxEvent {
 	@Column(name = "processed_at")
 	private Instant processedAt;
 
-	protected OutboxEvent() {
+	protected OutboxEventEntity() {
 	}
 
-	public static OutboxEvent merchantUpdated(UUID merchantId, MerchantStatus status) {
-		OutboxEvent event = new OutboxEvent();
-		event.id = UUID.randomUUID();
-		event.aggregateType = "MERCHANT";
-		event.aggregateId = merchantId;
-		event.eventType = "MerchantUpdated";
-		event.payload = Map.of("merchantId", merchantId.toString(), "status", status.name());
-		event.occurredAt = Instant.now();
-		return event;
+	public static OutboxEventEntity fromDomain(OutboxEvent event) {
+		OutboxEventEntity entity = new OutboxEventEntity();
+		entity.id = event.id();
+		entity.aggregateType = event.aggregateType();
+		entity.aggregateId = event.aggregateId();
+		entity.eventType = event.eventType();
+		entity.payload = event.payload();
+		entity.occurredAt = event.occurredAt();
+		return entity;
 	}
 }
