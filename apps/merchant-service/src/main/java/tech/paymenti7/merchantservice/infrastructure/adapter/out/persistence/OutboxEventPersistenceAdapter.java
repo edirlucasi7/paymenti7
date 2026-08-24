@@ -27,7 +27,7 @@ public class OutboxEventPersistenceAdapter implements OutboxEventPersistencePort
 
 	@Override
 	public List<OutboxEvent> lockLatestPendingEvents(int batchSize) {
-		return outboxEventJpaRepository.lockLatestPendingEvents(batchSize).stream()
+		return outboxEventJpaRepository.lockLatestPendingEventsForAggregateId(batchSize).stream()
 				.map(OutboxEventEntity::toDomain)
 				.toList();
 	}
