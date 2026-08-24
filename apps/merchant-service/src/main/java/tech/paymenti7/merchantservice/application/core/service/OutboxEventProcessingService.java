@@ -20,7 +20,7 @@ public class OutboxEventProcessingService {
 	public void processPendingEvents(int batchSize) {
 		for (var event : outboxEventPersistencePort.lockLatestPendingEvents(batchSize)) {
 			var processedAt = Instant.now();
-			outboxEventPersistencePort.suppressOlderPendingEvents(event.aggregateId(), event.id(), processedAt);
+			outboxEventPersistencePort.suppressOlderPendingEvents(event.aggregateId(), event.id(), event.occurredAt(), processedAt);
 			outboxEventPublisherPort.publish(event);
 			outboxEventPersistencePort.markPublished(event.id(), processedAt);
 		}

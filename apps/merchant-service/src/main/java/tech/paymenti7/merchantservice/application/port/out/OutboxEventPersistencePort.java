@@ -12,7 +12,7 @@ public interface OutboxEventPersistencePort {
 
 	List<OutboxEvent> lockLatestPendingEvents(int batchSize);
 
-	void suppressOlderPendingEvents(UUID aggregateId, UUID latestEventId, Instant processedAt);
+	void suppressOlderPendingEvents(UUID aggregateId, UUID latestEventId, Instant latestOccurredAt, Instant processedAt);
 
 	void markPublished(UUID eventId, Instant processedAt);
 }

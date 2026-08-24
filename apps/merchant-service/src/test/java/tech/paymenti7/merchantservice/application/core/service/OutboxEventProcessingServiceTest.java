@@ -30,7 +30,7 @@ class OutboxEventProcessingServiceTest {
 
 		assertEquals(20, persistence.requestedBatchSize);
 		assertEquals(List.of(latestEvent.id()), publisher.publishedEventIds);
-		assertEquals(List.of(new Suppression(merchantId, latestEvent.id())), persistence.suppressions);
+		assertEquals(List.of(new Suppression(merchantId, latestEvent.id(), latestEvent.occurredAt())), persistence.suppressions);
 		assertEquals(List.of(latestEvent.id()), persistence.publishedEventIds);
 	}
 
@@ -57,7 +57,7 @@ class OutboxEventProcessingServiceTest {
 		assertThrows(IllegalStateException.class, () -> service.processPendingEvents(20));
 
 		assertEquals(List.of(), persistence.publishedEventIds);
-		assertEquals(List.of(new Suppression(event.aggregateId(), event.id())), persistence.suppressions);
+		assertEquals(List.of(new Suppression(event.aggregateId(), event.id(), event.occurredAt())), persistence.suppressions);
 	}
 
 	private OutboxEvent pendingEvent(UUID merchantId, Instant occurredAt) {
@@ -88,8 +88,8 @@ class OutboxEventProcessingServiceTest {
 		}
 
 		@Override
-		public void suppressOlderPendingEvents(UUID aggregateId, UUID latestEventId, Instant processedAt) {
-			suppressions.add(new Suppression(aggregateId, latestEventId));
+		public void suppressOlderPendingEvents(UUID aggregateId, UUID latestEventId, Instant latestOccurredAt, Instant processedAt) {
+			suppressions.add(new Suppression(aggregateId, latestEventId, latestOccurredAt));
 		}
 
 		@Override
@@ -116,6 +116,6 @@ class OutboxEventProcessingServiceTest {
 		}
 	}
 
-	private record Suppression(UUID aggregateId, UUID latestEventId) {
+	private record Suppression(UUID aggregateId, UUID latestEventId, Instant latestOccurredAt) {
 	}
 }

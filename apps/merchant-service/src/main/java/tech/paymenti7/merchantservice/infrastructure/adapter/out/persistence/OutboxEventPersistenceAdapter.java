@@ -33,8 +33,8 @@ public class OutboxEventPersistenceAdapter implements OutboxEventPersistencePort
 	}
 
 	@Override
-	public void suppressOlderPendingEvents(UUID aggregateId, UUID latestEventId, Instant processedAt) {
-		outboxEventJpaRepository.suppressOlderPendingEvents(aggregateId, latestEventId, processedAt);
+	public void suppressOlderPendingEvents(UUID aggregateId, UUID latestEventId, Instant latestOccurredAt, Instant processedAt) {
+		outboxEventJpaRepository.suppressOlderPendingEvents(aggregateId, latestEventId, latestOccurredAt, processedAt);
 	}
 
 	@Override

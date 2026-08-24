@@ -24,7 +24,7 @@ public interface OutboxEventJpaRepository extends JpaRepository<OutboxEventEntit
 								AND newer.delivery_status = 'PENDING'
 								AND newer.processed_at IS NULL
 								AND (newer.occurred_at > e.occurred_at OR (newer.occurred_at = e.occurred_at AND newer.id > e.id))
-			  )
+			    )
 			ORDER BY e.occurred_at, e.id
 			LIMIT :batchSize
 			FOR UPDATE SKIP LOCKED
@@ -41,8 +41,11 @@ public interface OutboxEventJpaRepository extends JpaRepository<OutboxEventEntit
 				AND id <> :latestEventId
 				AND delivery_status = 'PENDING'
 				AND processed_at IS NULL
+				AND (occurred_at < :latestOccurredAt
+					OR (occurred_at = :latestOccurredAt AND id < :latestEventId))
 			""", nativeQuery = true)
 	void suppressOlderPendingEvents(UUID aggregateId, UUID latestEventId,
+			@Param("latestOccurredAt") Instant latestOccurredAt,
 			@Param("processedAt") Instant processedAt);
 
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
