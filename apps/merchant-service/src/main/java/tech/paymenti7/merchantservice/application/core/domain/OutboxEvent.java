@@ -12,15 +12,21 @@ public class OutboxEvent {
 	private final String eventType;
 	private final Map<String, String> payload;
 	private final Instant occurredAt;
+	private final OutboxEventDeliveryStatus deliveryStatus;
+	private final Instant processedAt;
+	private final UUID supersededByEventId;
 
 	private OutboxEvent(UUID id, String aggregateType, UUID aggregateId, String eventType, Map<String, String> payload,
-			Instant occurredAt) {
+			Instant occurredAt, OutboxEventDeliveryStatus deliveryStatus, Instant processedAt, UUID supersededByEventId) {
 		this.id = id;
 		this.aggregateType = aggregateType;
 		this.aggregateId = aggregateId;
 		this.eventType = eventType;
 		this.payload = payload;
 		this.occurredAt = occurredAt;
+		this.deliveryStatus = deliveryStatus;
+		this.processedAt = processedAt;
+		this.supersededByEventId = supersededByEventId;
 	}
 
 	public static OutboxEvent merchantUpdated(UUID merchantId, MerchantStatus status) {
@@ -30,7 +36,17 @@ public class OutboxEvent {
 				merchantId,
 				"MerchantUpdated",
 				Map.of("merchantId", merchantId.toString(), "status", status.name()),
-				Instant.now());
+				Instant.now(),
+				OutboxEventDeliveryStatus.PENDING,
+				null,
+				null);
+	}
+
+	public static OutboxEvent rehydrate(UUID id, String aggregateType, UUID aggregateId, String eventType,
+			Map<String, String> payload, Instant occurredAt, OutboxEventDeliveryStatus deliveryStatus, Instant processedAt,
+			UUID supersededByEventId) {
+		return new OutboxEvent(id, aggregateType, aggregateId, eventType, payload, occurredAt, deliveryStatus, processedAt,
+				supersededByEventId);
 	}
 
 	public UUID id() { return id; }
@@ -44,4 +60,10 @@ public class OutboxEvent {
 	public Map<String, String> payload() { return payload; }
 
 	public Instant occurredAt() { return occurredAt; }
+
+	public OutboxEventDeliveryStatus deliveryStatus() { return deliveryStatus; }
+
+	public Instant processedAt() { return processedAt; }
+
+	public UUID supersededByEventId() { return supersededByEventId; }
 }
