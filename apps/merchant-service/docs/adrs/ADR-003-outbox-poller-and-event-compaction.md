@@ -2,6 +2,7 @@
 
 * **Status:** Aprovado
 * **Data:** 2026-08-24
+* **Autor:** Edir Lucas da Silva Icety Braga
 * **Impacto:** `merchant-service`
 
 ## 1. Contexto e Problema

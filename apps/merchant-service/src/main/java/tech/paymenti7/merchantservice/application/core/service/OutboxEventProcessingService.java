@@ -16,7 +16,6 @@ public class OutboxEventProcessingService {
 		this.outboxEventPublisherPort = outboxEventPublisherPort;
 	}
 
-	// TODO aqui ainda acredito que dê para ficar mais simples, mas quando tiver integrado com rabbitmq, revemos.
 	public void processPendingEvents(int batchSize) {
 		for (var event : outboxEventPersistencePort.lockLatestPendingEvents(batchSize)) {
 			var processedAt = Instant.now();
