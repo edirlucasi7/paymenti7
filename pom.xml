@@ -18,6 +18,7 @@
 	</properties>
 	<modules>
 		<module>apps/merchant-service</module>
+		<module>apps/payment-gateway-core</module>
 		<module>libs/resilience</module>
 	</modules>
 
