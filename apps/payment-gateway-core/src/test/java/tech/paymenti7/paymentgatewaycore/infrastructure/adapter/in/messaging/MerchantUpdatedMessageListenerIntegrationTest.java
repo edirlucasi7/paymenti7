@@ -25,6 +25,7 @@ import com.redis.testcontainers.RedisContainer;
 
 import tools.jackson.databind.ObjectMapper;
 
+import tech.paymenti7.paymentgatewaycore.application.core.domain.MerchantStatus;
 import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.cache.MerchantCacheInvalidationService;
 
 @SpringBootTest(properties = {
@@ -98,6 +99,21 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 		assertThat(deadLetter.getBody()).isEqualTo("{}".getBytes(StandardCharsets.UTF_8));
 	}
 
+	@Test
+	void routesAnUnknownMerchantStatusToTheDeadLetterQueue() {
+		UUID merchantId = UUID.randomUUID();
+		String event = """
+				{"schemaVersion":1,"eventId":"%s","aggregateType":"MERCHANT","aggregateId":"%s","eventType":"MerchantUpdated","occurredAt":"%s","payload":{"merchantId":"%s","status":"SUSPENDED"}}
+				""".formatted(UUID.randomUUID(), merchantId, Instant.now(), merchantId);
+		rabbitTemplate.send(EXCHANGE, ROUTING_KEY,
+				new Message(event.getBytes(StandardCharsets.UTF_8), new MessageProperties()));
+
+		Message deadLetter = rabbitTemplate.receive(DLQ, Duration.ofSeconds(5).toMillis());
+
+		assertThat(deadLetter).isNotNull();
+		assertThat(deadLetter.getBody()).isEqualTo(event.getBytes(StandardCharsets.UTF_8));
+	}
+
 	private void send(MerchantUpdatedMessage event) throws Exception {
 		byte[] body = objectMapper.writeValueAsBytes(event);
 		MessageProperties properties = new MessageProperties();
@@ -107,7 +123,7 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 
 	private MerchantUpdatedMessage validMessage(UUID eventId, UUID merchantId) {
 		return new MerchantUpdatedMessage(1, eventId, "MERCHANT", merchantId, "MerchantUpdated", Instant.now(),
-				new MerchantUpdatedMessage.MerchantUpdatedPayload(merchantId, "ACTIVE"));
+				new MerchantUpdatedMessage.MerchantUpdatedPayload(merchantId, MerchantStatus.ACTIVE));
 	}
 
 	private String cacheKey(UUID merchantId) {
