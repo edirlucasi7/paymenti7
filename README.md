@@ -10,6 +10,10 @@ Plataforma de pagamentos composta por serviços Spring Boot. O repositório cont
 | `apps/payment-gateway-core` | Valida merchants antes do fluxo de pagamento; consome eventos, invalida o cache e o reidrata em cache miss. |
 | `libs/resilience` | Biblioteca compartilhada de resiliência. |
 
+## Visão da arquitetura atual
+
+![Diagrama C4 do fluxo de cache-aside de merchant](apps/payment-gateway-core/docs/adrs/ADR-003-cache-aside-merchant-rehydration-C4-model.png)
+
 ## Tecnologias
 
 - Java 25 e Spring Boot 4.1
