@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.Map;
 import java.util.UUID;
 
@@ -14,6 +18,7 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -28,7 +33,7 @@ import tools.jackson.databind.ObjectMapper;
 import tech.paymenti7.paymentgatewaycore.application.core.domain.MerchantStatus;
 import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.cache.MerchantCacheInvalidationService;
 
-@SpringBootTest(properties = {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"payment.gateway.merchant-events.retry.initial-interval=10ms",
 		"payment.gateway.merchant-events.retry.max-interval=10ms"
 })
@@ -53,6 +58,9 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 
 	@Autowired
 	private ObjectMapper objectMapper;
+
+	@LocalServerPort
+	private int port;
 
 	@DynamicPropertySource
 	static void configureContainers(DynamicPropertyRegistry registry) {
@@ -112,6 +120,24 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 
 		assertThat(deadLetter).isNotNull();
 		assertThat(deadLetter.getBody()).isEqualTo(event.getBytes(StandardCharsets.UTF_8));
+	}
+
+	@Test
+	void exposesOnlyThePublicPaymentApiInOpenApi() throws Exception {
+		HttpResponse<String> response = HttpClient.newHttpClient().send(
+				HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/v3/api-docs")).GET().build(),
+				HttpResponse.BodyHandlers.ofString());
+
+		var specification = objectMapper.readTree(response.body());
+		assertThat(response.statusCode()).isEqualTo(200);
+		assertThat(specification.get("info").get("title").asText()).isEqualTo("Payment Gateway Core API");
+		assertThat(specification.get("paths").has("/v1/payments")).isTrue();
+		assertThat(specification.get("paths").get("/v1/payments").has("post")).isTrue();
+
+		HttpResponse<Void> swaggerUi = HttpClient.newHttpClient().send(
+				HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/swagger-ui.html")).GET().build(),
+				HttpResponse.BodyHandlers.discarding());
+		assertThat(swaggerUi.statusCode()).isBetween(300, 399);
 	}
 
 	private void send(MerchantUpdatedMessage event) throws Exception {
