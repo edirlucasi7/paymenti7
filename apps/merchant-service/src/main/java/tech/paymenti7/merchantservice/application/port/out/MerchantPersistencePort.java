@@ -9,5 +9,5 @@ public interface MerchantPersistencePort {
 
 	Optional<Merchant> findById(UUID merchantId);
 
-	void save(Merchant merchant);
+	Merchant save(Merchant merchant);
 }

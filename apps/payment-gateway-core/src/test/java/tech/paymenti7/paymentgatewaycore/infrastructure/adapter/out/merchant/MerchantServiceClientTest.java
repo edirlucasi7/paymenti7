@@ -40,19 +40,20 @@ class MerchantServiceClientTest {
 	@Test
 	void deserializesTheMerchantReturnedByTheInternalApi() {
 		UUID merchantId = UUID.randomUUID();
-		server.createContext("/internal/v1/merchants/" + merchantId,
-				exchange -> respond(exchange, 200, "{\"id\":\"" + merchantId + "\",\"status\":\"ACTIVE\"}"));
+		server.createContext("/internal/v2/merchants/" + merchantId,
+				exchange -> respond(exchange, 200, "{\"id\":\"" + merchantId + "\",\"status\":\"ACTIVE\",\"revision\":3}"));
 
 		var merchant = merchantServiceClient.getMerchant(merchantId);
 
 		assertThat(merchant.id()).isEqualTo(merchantId);
 		assertThat(merchant.status()).isEqualTo(MerchantStatus.ACTIVE);
+		assertThat(merchant.revision()).isEqualTo(3L);
 	}
 
 	@Test
 	void mapsAnAbsentMerchantToNotFound() {
 		UUID merchantId = UUID.randomUUID();
-		server.createContext("/internal/v1/merchants/" + merchantId, exchange -> respond(exchange, 404, "{}"));
+		server.createContext("/internal/v2/merchants/" + merchantId, exchange -> respond(exchange, 404, "{}"));
 
 		assertThatThrownBy(() -> merchantServiceClient.getMerchant(merchantId))
 				.isInstanceOf(MerchantNotFoundException.class);

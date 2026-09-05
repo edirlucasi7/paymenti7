@@ -9,12 +9,18 @@ public class Merchant {
 	private MerchantStatus status;
 	private final Instant createdAt;
 	private Instant updatedAt;
+	private final long revision;
 
 	public Merchant(UUID id, MerchantStatus status, Instant createdAt, Instant updatedAt) {
+		this(id, status, createdAt, updatedAt, 0);
+	}
+
+	public Merchant(UUID id, MerchantStatus status, Instant createdAt, Instant updatedAt, long revision) {
 		this.id = id;
 		this.status = status;
 		this.createdAt = createdAt;
 		this.updatedAt = updatedAt;
+		this.revision = revision;
 	}
 
 	public UUID id() {
@@ -31,6 +37,10 @@ public class Merchant {
 
 	public Instant updatedAt() {
 		return updatedAt;
+	}
+
+	public long revision() {
+		return revision;
 	}
 
 	public boolean hasStatus(MerchantStatus status) {

@@ -9,6 +9,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import tech.paymenti7.merchantservice.application.core.domain.Merchant;
 import tech.paymenti7.merchantservice.application.core.domain.MerchantStatus;
 
@@ -29,6 +30,10 @@ public class MerchantEntity {
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
+	@Version
+	@Column(nullable = false)
+	private Long revision;
+
 	protected MerchantEntity() {
 	}
 
@@ -38,10 +43,11 @@ public class MerchantEntity {
 		entity.status = merchant.status();
 		entity.createdAt = merchant.createdAt();
 		entity.updatedAt = merchant.updatedAt();
+		entity.revision = merchant.revision();
 		return entity;
 	}
 
 	public Merchant toDomain() {
-		return new Merchant(id, status, createdAt, updatedAt);
+		return new Merchant(id, status, createdAt, updatedAt, revision);
 	}
 }

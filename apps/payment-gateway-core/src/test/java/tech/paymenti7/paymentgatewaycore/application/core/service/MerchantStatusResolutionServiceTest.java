@@ -34,7 +34,7 @@ class MerchantStatusResolutionServiceTest {
 	@Test
 	void returnsTheCachedMerchantWithoutCallingMerchantService() {
 		UUID merchantId = UUID.randomUUID();
-		MerchantDetails cachedMerchant = new MerchantDetails(merchantId, MerchantStatus.ACTIVE);
+		MerchantDetails cachedMerchant = new MerchantDetails(merchantId, MerchantStatus.ACTIVE, 3L);
 		given(merchantCacheService.find(merchantId)).willReturn(Optional.of(cachedMerchant));
 
 		MerchantDetails result = merchantStatusResolutionService.resolve(merchantId);
@@ -47,7 +47,7 @@ class MerchantStatusResolutionServiceTest {
 	@Test
 	void loadsAndCachesTheMerchantWhenTheCacheIsMissing() {
 		UUID merchantId = UUID.randomUUID();
-		MerchantDetails merchant = new MerchantDetails(merchantId, MerchantStatus.INACTIVE);
+		MerchantDetails merchant = new MerchantDetails(merchantId, MerchantStatus.INACTIVE, 3L);
 		given(merchantCacheService.find(merchantId)).willReturn(Optional.empty());
 		given(merchantServiceClient.getMerchant(merchantId)).willReturn(merchant);
 

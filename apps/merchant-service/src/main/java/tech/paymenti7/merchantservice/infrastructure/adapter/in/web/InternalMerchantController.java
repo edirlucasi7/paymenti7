@@ -13,7 +13,6 @@ import tech.paymenti7.merchantservice.application.port.in.GetMerchantUseCase;
 
 @Hidden
 @RestController
-@RequestMapping("/internal/v1/merchants")
 public class InternalMerchantController {
 
 	private final GetMerchantUseCase getMerchantUseCase;
@@ -22,12 +21,21 @@ public class InternalMerchantController {
 		this.getMerchantUseCase = getMerchantUseCase;
 	}
 
-	@GetMapping("/{merchantId}")
-	MerchantResponse getMerchant(@PathVariable UUID merchantId) {
+	@GetMapping("/internal/v1/merchants/{merchantId}")
+	MerchantResponseV1 getMerchantV1(@PathVariable UUID merchantId) {
 		var merchant = getMerchantUseCase.getById(merchantId);
-		return new MerchantResponse(merchant.id(), merchant.status().name());
+		return new MerchantResponseV1(merchant.id(), merchant.status().name());
 	}
 
-	record MerchantResponse(UUID id, String status) {
+	@GetMapping("/internal/v2/merchants/{merchantId}")
+	MerchantResponseV2 getMerchantV2(@PathVariable UUID merchantId) {
+		var merchant = getMerchantUseCase.getById(merchantId);
+		return new MerchantResponseV2(merchant.id(), merchant.status().name(), merchant.revision());
+	}
+
+	record MerchantResponseV1(UUID id, String status) {
+	}
+
+	record MerchantResponseV2(UUID id, String status, long revision) {
 	}
 }

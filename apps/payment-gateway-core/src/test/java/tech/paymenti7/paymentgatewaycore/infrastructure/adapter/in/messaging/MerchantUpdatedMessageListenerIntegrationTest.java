@@ -31,6 +31,8 @@ import com.redis.testcontainers.RedisContainer;
 import tools.jackson.databind.ObjectMapper;
 
 import tech.paymenti7.paymentgatewaycore.application.core.domain.MerchantStatus;
+import tech.paymenti7.paymentgatewaycore.application.core.domain.MerchantDetails;
+import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.cache.MerchantCacheService;
 import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.cache.MerchantCacheInvalidationService;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -58,6 +60,9 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 
 	@Autowired
 	private ObjectMapper objectMapper;
+
+	@Autowired
+	private MerchantCacheService merchantCacheService;
 
 	@LocalServerPort
 	private int port;
@@ -95,6 +100,30 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 
 		send(validMessage(eventId, merchantId));
 		awaitUntil(() -> "rehydrated".equals(redisTemplate.opsForValue().get(cacheKey(merchantId))));
+	}
+
+	@Test
+	void preservesACacheValueWhenAnOlderEventArrivesAfterANewerOne() throws Exception {
+		UUID merchantId = UUID.randomUUID();
+		send(validMessage(UUID.randomUUID(), merchantId, 4L));
+		awaitUntil(() -> "4".equals(redisTemplate.opsForValue().get(revisionKey(merchantId))));
+		redisTemplate.opsForValue().set(cacheKey(merchantId), "newer", Duration.ofMinutes(10));
+		UUID olderEventId = UUID.randomUUID();
+
+		send(validMessage(olderEventId, merchantId, 3L));
+
+		awaitUntil(() -> Boolean.TRUE.equals(redisTemplate.hasKey(processedEventKey(olderEventId)))
+				&& "newer".equals(redisTemplate.opsForValue().get(cacheKey(merchantId))));
+	}
+
+	@Test
+	void doesNotStoreAResponseOlderThanTheKnownRevision() {
+		UUID merchantId = UUID.randomUUID();
+		redisTemplate.opsForValue().set(revisionKey(merchantId), "4", Duration.ofHours(24));
+
+		merchantCacheService.store(new MerchantDetails(merchantId, MerchantStatus.ACTIVE, 3L));
+
+		assertThat(redisTemplate.opsForValue().get(cacheKey(merchantId))).isNull();
 	}
 
 	@Test
@@ -148,8 +177,12 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 	}
 
 	private MerchantUpdatedMessage validMessage(UUID eventId, UUID merchantId) {
+		return validMessage(eventId, merchantId, 3L);
+	}
+
+	private MerchantUpdatedMessage validMessage(UUID eventId, UUID merchantId, long revision) {
 		return new MerchantUpdatedMessage(1, eventId, "MERCHANT", merchantId, "MerchantUpdated", Instant.now(),
-				new MerchantUpdatedMessage.MerchantUpdatedPayload(merchantId, MerchantStatus.ACTIVE));
+				new MerchantUpdatedMessage.MerchantUpdatedPayload(merchantId, MerchantStatus.ACTIVE, revision));
 	}
 
 	private String cacheKey(UUID merchantId) {
@@ -158,6 +191,10 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 
 	private String processedEventKey(UUID eventId) {
 		return MerchantCacheInvalidationService.processedEventKey(validMessage(eventId, UUID.randomUUID()));
+	}
+
+	private String revisionKey(UUID merchantId) {
+		return MerchantCacheInvalidationService.merchantRevisionKey(validMessage(UUID.randomUUID(), merchantId));
 	}
 
 	private void awaitUntil(Check condition) {

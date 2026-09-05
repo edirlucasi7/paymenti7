@@ -108,7 +108,7 @@ public class RabbitMqOutboxEventPublisher implements OutboxEventPublisherPort {
 	}
 
 	private record OutboxEventMessage(int schemaVersion, String eventId, String aggregateType, String aggregateId,
-			String eventType, String occurredAt, Map<String, String> payload) {
+			String eventType, String occurredAt, Map<String, Object> payload) {
 
 		private static OutboxEventMessage from(OutboxEvent event) {
 			return new OutboxEventMessage(1, event.id().toString(), event.aggregateType(), event.aggregateId().toString(),

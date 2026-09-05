@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import tech.paymenti7.paymentgatewaycore.application.core.domain.MerchantStatus;
 
@@ -32,6 +33,7 @@ public record MerchantUpdatedMessage(@Min(1) int schemaVersion, @NotNull UUID ev
 		}
 	}
 
-	public record MerchantUpdatedPayload(@NotNull UUID merchantId, @NotNull MerchantStatus status) {
+	public record MerchantUpdatedPayload(@NotNull UUID merchantId, @NotNull MerchantStatus status,
+			@NotNull @PositiveOrZero Long revision) {
 	}
 }
