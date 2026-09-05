@@ -9,7 +9,7 @@ public class Merchant {
 	private MerchantStatus status;
 	private final Instant createdAt;
 	private Instant updatedAt;
-	private final long revision;
+	private long revision;
 
 	public Merchant(UUID id, MerchantStatus status, Instant createdAt, Instant updatedAt) {
 		this(id, status, createdAt, updatedAt, 0);
@@ -50,5 +50,6 @@ public class Merchant {
 	public void updateStatus(MerchantStatus status) {
 		this.status = status;
 		this.updatedAt = Instant.now();
+		this.revision++;
 	}
 }
