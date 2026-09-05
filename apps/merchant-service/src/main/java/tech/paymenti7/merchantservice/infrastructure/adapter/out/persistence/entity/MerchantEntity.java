@@ -29,6 +29,9 @@ public class MerchantEntity {
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
+	@Column(nullable = false)
+	private Long revision;
+
 	protected MerchantEntity() {
 	}
 
@@ -38,10 +41,11 @@ public class MerchantEntity {
 		entity.status = merchant.status();
 		entity.createdAt = merchant.createdAt();
 		entity.updatedAt = merchant.updatedAt();
+		entity.revision = merchant.revision();
 		return entity;
 	}
 
 	public Merchant toDomain() {
-		return new Merchant(id, status, createdAt, updatedAt);
+		return new Merchant(id, status, createdAt, updatedAt, revision);
 	}
 }

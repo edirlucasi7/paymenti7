@@ -31,7 +31,8 @@ public class MerchantStatusUpdateService {
 		}
 
 		merchant.updateStatus(command.status());
-		merchantPersistencePort.save(merchant);
-		outboxEventPersistencePort.save(OutboxEvent.merchantUpdated(command.merchantId(), command.status()));
+		var updatedMerchant = merchantPersistencePort.save(merchant);
+		outboxEventPersistencePort.save(
+				OutboxEvent.merchantUpdated(updatedMerchant.id(), updatedMerchant.status(), updatedMerchant.revision()));
 	}
 }

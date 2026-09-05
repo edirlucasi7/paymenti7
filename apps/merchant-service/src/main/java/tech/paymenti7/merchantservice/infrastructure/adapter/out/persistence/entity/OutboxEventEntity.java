@@ -34,7 +34,7 @@ public class OutboxEventEntity {
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(nullable = false, columnDefinition = "jsonb")
-	private Map<String, String> payload;
+	private Map<String, Object> payload;
 
 	@Column(name = "occurred_at", nullable = false)
 	private Instant occurredAt;

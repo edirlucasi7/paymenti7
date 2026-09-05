@@ -55,6 +55,7 @@ class RabbitMqOutboxEventPublisherTest {
 		assertEquals(event.id().toString(), body.get("eventId").asText());
 		assertEquals(event.aggregateId().toString(), body.get("aggregateId").asText());
 		assertEquals("ACTIVE", body.get("payload").get("status").asText());
+		assertEquals(3, body.get("payload").get("revision").asInt());
 		assertEquals(MessageDeliveryMode.PERSISTENT, message.getMessageProperties().getDeliveryMode());
 		assertEquals("application/json", message.getMessageProperties().getContentType());
 		assertThat(output).contains("INFO").contains("Publishing outbox event to RabbitMQ")
@@ -94,7 +95,8 @@ class RabbitMqOutboxEventPublisherTest {
 	private OutboxEvent pendingEvent() {
 		var merchantId = UUID.randomUUID();
 		return OutboxEvent.rehydrate(UUID.randomUUID(), "MERCHANT", merchantId, "MerchantUpdated",
-				Map.of("merchantId", merchantId.toString(), "status", "ACTIVE"), Instant.parse("2026-08-28T10:00:00Z"),
+				Map.of("merchantId", merchantId.toString(), "status", "ACTIVE", "revision", 3L),
+				Instant.parse("2026-08-28T10:00:00Z"),
 				OutboxEventDeliveryStatus.PENDING, null, null);
 	}
 }

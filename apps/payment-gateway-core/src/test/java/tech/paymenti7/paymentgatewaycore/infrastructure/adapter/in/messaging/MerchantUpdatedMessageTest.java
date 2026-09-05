@@ -35,7 +35,17 @@ class MerchantUpdatedMessageTest {
 	@Test
 	void rejectsMissingRequiredFieldsThroughBeanValidation() {
 		MerchantUpdatedMessage message = new MerchantUpdatedMessage(1, null, "MERCHANT", null, "MerchantUpdated", null,
-				new MerchantUpdatedMessage.MerchantUpdatedPayload(null, null));
+				new MerchantUpdatedMessage.MerchantUpdatedPayload(null, null, null));
+
+		assertThat(validator.validate(message)).isNotEmpty();
+	}
+
+	@Test
+	void rejectsAnEventWithoutRevisionThroughBeanValidation() {
+		UUID merchantId = UUID.randomUUID();
+		MerchantUpdatedMessage message = new MerchantUpdatedMessage(1, UUID.randomUUID(), "MERCHANT", merchantId,
+				"MerchantUpdated", Instant.now(),
+				new MerchantUpdatedMessage.MerchantUpdatedPayload(merchantId, MerchantStatus.ACTIVE, null));
 
 		assertThat(validator.validate(message)).isNotEmpty();
 	}
@@ -46,6 +56,6 @@ class MerchantUpdatedMessageTest {
 
 	private MerchantUpdatedMessage message(UUID eventId, UUID aggregateId, UUID payloadMerchantId) {
 		return new MerchantUpdatedMessage(1, eventId, "MERCHANT", aggregateId, "MerchantUpdated", Instant.now(),
-				new MerchantUpdatedMessage.MerchantUpdatedPayload(payloadMerchantId, MerchantStatus.ACTIVE));
+				new MerchantUpdatedMessage.MerchantUpdatedPayload(payloadMerchantId, MerchantStatus.ACTIVE, 3L));
 	}
 }

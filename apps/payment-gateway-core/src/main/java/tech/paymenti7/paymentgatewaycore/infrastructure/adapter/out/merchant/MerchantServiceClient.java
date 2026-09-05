@@ -24,13 +24,14 @@ public class MerchantServiceClient {
 	public MerchantDetails getMerchant(UUID merchantId) {
 		try {
 			var response = merchantServiceRestClient.get()
-					.uri("/internal/v1/merchants/{merchantId}", merchantId)
+					.uri("/internal/v2/merchants/{merchantId}", merchantId)
 					.retrieve()
 					.body(MerchantServiceMerchantResponse.class);
-			if (response == null || !merchantId.equals(response.id()) || response.status() == null) {
+			if (response == null || !merchantId.equals(response.id()) || response.status() == null || response.revision() == null
+					|| response.revision() < 0) {
 				throw new MerchantServiceUnavailableException("Merchant service returned an invalid merchant response");
 			}
-			return new MerchantDetails(response.id(), MerchantStatus.valueOf(response.status()));
+			return new MerchantDetails(response.id(), MerchantStatus.valueOf(response.status()), response.revision());
 		}
 		catch (RestClientResponseException exception) {
 			if (exception.getStatusCode().value() == 404) {

@@ -25,7 +25,7 @@ public class MerchantPersistenceAdapter implements MerchantPersistencePort {
 	}
 
 	@Override
-	public void save(Merchant merchant) {
-		merchantJpaRepository.save(MerchantEntity.fromDomain(merchant));
+	public Merchant save(Merchant merchant) {
+		return merchantJpaRepository.saveAndFlush(MerchantEntity.fromDomain(merchant)).toDomain();
 	}
 }
