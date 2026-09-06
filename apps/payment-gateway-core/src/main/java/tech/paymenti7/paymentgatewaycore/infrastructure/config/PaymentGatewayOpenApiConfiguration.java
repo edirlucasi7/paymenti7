@@ -15,8 +15,8 @@ public class PaymentGatewayOpenApiConfiguration {
 		return new OpenAPI()
 				.info(new Info()
 						.title("Payment Gateway Core API")
-							.description("API de validação de merchant para o fluxo de pagamento.")
+							.description("API idempotente de entrada de intenções de pagamento.")
 							.version("v1"))
-				.addTagsItem(new Tag().name("Payments").description("Validação de merchants antes do processamento."));
+				.addTagsItem(new Tag().name("Payments").description("Entrada idempotente e assíncrona de pagamentos."));
 	}
 }

@@ -1,13 +1,13 @@
 # Paymenti7 Platform
 
-Plataforma de pagamentos composta por serviços Spring Boot. O repositório contém o ciclo de atualização de merchants, publicação de eventos pelo padrão Outbox e validação de merchants pelo gateway com cache no Redis.
+Plataforma de pagamentos composta por serviços Spring Boot. O repositório contém o ciclo de atualização de merchants, publicação de eventos pelo padrão Outbox e entrada idempotente de pagamentos pelo gateway.
 
 ## Módulos
 
 | Módulo | Responsabilidade |
 | --- | --- |
 | `apps/merchant-service` | Atualiza e consulta merchants; persiste e publica eventos `MerchantUpdated` pelo padrão Outbox. |
-| `apps/payment-gateway-core` | Valida merchants antes do fluxo de pagamento; consome eventos, invalida o cache e o reidrata em cache miss. |
+| `apps/payment-gateway-core` | Recebe intenções de pagamento de forma idempotente, publica comandos pela outbox e mantém o cache de merchants. |
 | `libs/resilience` | Biblioteca compartilhada de resiliência. |
 
 ## Visão da arquitetura atual
@@ -18,7 +18,7 @@ Plataforma de pagamentos composta por serviços Spring Boot. O repositório cont
 
 - Java 25 e Spring Boot 4.1
 - Maven Wrapper
-- PostgreSQL 17 com Flyway e JPA/Hibernate
+- PostgreSQL 17 com bancos independentes por serviço, Flyway e JPA/Hibernate
 - RabbitMQ 4.3 para mensageria
 - Redis 7.4 para cache e idempotência do consumer
 - Docker Compose para infraestrutura local
@@ -68,7 +68,8 @@ O gateway usa `MERCHANT_SERVICE_URL` para acessar o merchant-service. No ambient
 | --- | ---: | --- |
 | payment-gateway-core | 8080 | `http://localhost:8080` |
 | merchant-service | 8090 | `http://localhost:8090` |
-| PostgreSQL | 5432 | `localhost:5432` |
+| PostgreSQL do merchant-service | 5432 | `localhost:5432` |
+| PostgreSQL do payment-gateway-core | 5433 | `localhost:5433` |
 | RabbitMQ AMQP | 5672 | `localhost:5672` |
 | RabbitMQ Management | 15672 | `http://localhost:15672` |
 | Redis | 6380 | `localhost:6380` |
@@ -87,7 +88,7 @@ Rotas públicas documentadas:
 | Serviço | Método | Rota | Descrição |
 | --- | --- | --- | --- |
 | merchant-service | `PUT` | `/v1/admin/merchants/{merchantId}` | Solicita a atualização do status de um merchant. |
-| payment-gateway-core | `POST` | `/v1/payments` | Valida o status de um merchant para o fluxo de pagamento. Não efetua uma autorização financeira. |
+| payment-gateway-core | `POST` | `/v1/payments` | Aceita uma intenção de pagamento de forma idempotente e retorna `202` durante o processamento. |
 
 `GET /internal/v1/merchants/{merchantId}` é uma rota de comunicação entre serviços e permanece fora do Swagger público.
 

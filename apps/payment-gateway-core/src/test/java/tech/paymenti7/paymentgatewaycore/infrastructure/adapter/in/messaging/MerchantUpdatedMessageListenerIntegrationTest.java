@@ -22,8 +22,10 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
 import com.redis.testcontainers.RedisContainer;
@@ -40,6 +42,7 @@ import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.cache.Mercha
 		"payment.gateway.merchant-events.retry.max-interval=10ms"
 })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class MerchantUpdatedMessageListenerIntegrationTest {
 
 	private static final String EXCHANGE = "merchant.events";
@@ -51,6 +54,9 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 
 	@Container
 	static final RedisContainer REDIS = new RedisContainer("redis:7.4-alpine");
+
+	@Container
+	static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
 
 	@Autowired
 	private RabbitTemplate rabbitTemplate;
@@ -75,6 +81,9 @@ class MerchantUpdatedMessageListenerIntegrationTest {
 		registry.add("spring.rabbitmq.password", RABBITMQ::getAdminPassword);
 		registry.add("spring.data.redis.host", REDIS::getRedisHost);
 		registry.add("spring.data.redis.port", REDIS::getRedisPort);
+		registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+		registry.add("spring.datasource.username", POSTGRES::getUsername);
+		registry.add("spring.datasource.password", POSTGRES::getPassword);
 	}
 
 	@Test
