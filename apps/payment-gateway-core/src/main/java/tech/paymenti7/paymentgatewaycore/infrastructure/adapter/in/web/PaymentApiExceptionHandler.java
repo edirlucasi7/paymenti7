@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import tech.paymenti7.paymentgatewaycore.application.shared.exception.MerchantNotFoundException;
 import tech.paymenti7.paymentgatewaycore.application.shared.exception.MerchantServiceUnavailableException;
+import tech.paymenti7.paymentgatewaycore.application.shared.exception.IdempotencyConflictException;
+import tech.paymenti7.paymentgatewaycore.application.shared.exception.InactiveMerchantException;
 
 @RestControllerAdvice
 public class PaymentApiExceptionHandler {
@@ -22,6 +24,20 @@ public class PaymentApiExceptionHandler {
 	ProblemDetail handleMerchantServiceUnavailable(MerchantServiceUnavailableException exception) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
 		problem.setTitle("Merchant service unavailable");
+		return problem;
+	}
+
+	@ExceptionHandler(IdempotencyConflictException.class)
+	ProblemDetail handleIdempotencyConflict(IdempotencyConflictException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+		problem.setTitle("Idempotency conflict");
+		return problem;
+	}
+
+	@ExceptionHandler(InactiveMerchantException.class)
+	ProblemDetail handleInactiveMerchant(InactiveMerchantException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
+		problem.setTitle("Inactive merchant");
 		return problem;
 	}
 }
