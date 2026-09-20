@@ -6,6 +6,8 @@ import java.util.Map;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +26,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import tech.paymenti7.paymentgatewaycore.application.port.in.SubmitPaymentCommand;
 import tech.paymenti7.paymentgatewaycore.application.port.in.SubmitPaymentUseCase;
+import tech.paymenti7.paymentgatewaycore.application.port.in.GetPaymentUseCase;
 
 @Tag(name = "Payments", description = "Entrada idempotente de intenções de pagamento.")
 @RestController
@@ -31,9 +34,11 @@ import tech.paymenti7.paymentgatewaycore.application.port.in.SubmitPaymentUseCas
 public class PaymentController {
 
 	private final SubmitPaymentUseCase submitPaymentUseCase;
+	private final GetPaymentUseCase getPaymentUseCase;
 
-	public PaymentController(SubmitPaymentUseCase submitPaymentUseCase) {
+	public PaymentController(SubmitPaymentUseCase submitPaymentUseCase, GetPaymentUseCase getPaymentUseCase) {
 		this.submitPaymentUseCase = submitPaymentUseCase;
+		this.getPaymentUseCase = getPaymentUseCase;
 	}
 
 	@Operation(summary = "Submete uma intenção de pagamento",
@@ -70,9 +75,23 @@ public class PaymentController {
 			@RequestHeader("Idempotency-Key") UUID idempotencyKey,
 			@Valid @RequestBody PaymentRequest request) {
 		var result = submitPaymentUseCase.submit(
-				new SubmitPaymentCommand(request.merchantId(), request.amount(), request.currency(), idempotencyKey));
+				new SubmitPaymentCommand(request.merchantId(), request.amount(), request.currency(),
+						request.paymentMethodToken(), idempotencyKey));
 		var response = ResponseEntity.status(result.httpStatus());
 		result.responseHeaders().forEach(response::header);
 		return response.body(result.responseBody());
+	}
+
+	@Operation(summary = "Consulta o estado atual de um pagamento")
+	@ApiResponses({
+			@ApiResponse(responseCode = "200", description = "Pagamento encontrado",
+					content = @Content(schema = @Schema(implementation = PaymentResponse.class))),
+			@ApiResponse(responseCode = "404", description = "Pagamento não encontrado",
+					content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+	})
+	@GetMapping("/{paymentId}")
+	PaymentResponse get(@PathVariable UUID paymentId) {
+		var payment = getPaymentUseCase.get(paymentId);
+		return new PaymentResponse(payment.paymentId(), payment.status());
 	}
 }

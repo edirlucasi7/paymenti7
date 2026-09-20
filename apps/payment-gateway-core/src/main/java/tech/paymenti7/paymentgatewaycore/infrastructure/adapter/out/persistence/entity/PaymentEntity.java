@@ -29,6 +29,9 @@ public class PaymentEntity {
 	@Column(nullable = false, length = 3)
 	private String currency;
 
+	@Column(name = "payment_method_token", nullable = false, length = 512)
+	private String paymentMethodToken;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 16)
 	private PaymentStatus status;
@@ -42,12 +45,14 @@ public class PaymentEntity {
 	protected PaymentEntity() {
 	}
 
-	public static PaymentEntity processing(UUID id, UUID merchantId, BigDecimal amount, String currency, Instant now) {
+	public static PaymentEntity processing(UUID id, UUID merchantId, BigDecimal amount, String currency,
+			String paymentMethodToken, Instant now) {
 		var entity = new PaymentEntity();
 		entity.id = id;
 		entity.merchantId = merchantId;
 		entity.amount = amount;
 		entity.currency = currency;
+		entity.paymentMethodToken = paymentMethodToken;
 		entity.status = PaymentStatus.PROCESSING;
 		entity.createdAt = now;
 		entity.updatedAt = now;
@@ -56,6 +61,10 @@ public class PaymentEntity {
 
 	public UUID getId() {
 		return id;
+	}
+
+	public PaymentStatus getStatus() {
+		return status;
 	}
 
 	public void complete(PaymentStatus terminalStatus, Instant completedAt) {

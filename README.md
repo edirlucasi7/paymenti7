@@ -8,6 +8,7 @@ Plataforma de pagamentos composta por serviços Spring Boot. O repositório cont
 | --- | --- |
 | `apps/merchant-service` | Atualiza e consulta merchants; persiste e publica eventos `MerchantUpdated` pelo padrão Outbox. |
 | `apps/payment-gateway-core` | Recebe intenções de pagamento de forma idempotente, publica comandos pela outbox e mantém o cache de merchants. |
+| `apps/payment-authorization-service` | Consome pagamentos, roteia entre adquirentes, aplica circuit breaker/fallback seguro e publica o resultado. |
 | `libs/resilience` | Biblioteca compartilhada de resiliência. |
 
 ## Visão da arquitetura atual
@@ -46,7 +47,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Em dois terminais diferentes, ainda a partir da raiz, inicie as aplicações:
+Em três terminais diferentes, ainda a partir da raiz, inicie as aplicações:
 
 ```bash
 ./mvnw -pl apps/merchant-service spring-boot:run
@@ -54,6 +55,10 @@ Em dois terminais diferentes, ainda a partir da raiz, inicie as aplicações:
 
 ```bash
 ./mvnw -pl apps/payment-gateway-core spring-boot:run
+```
+
+```bash
+./mvnw -pl apps/payment-authorization-service spring-boot:run
 ```
 
 O gateway usa `MERCHANT_SERVICE_URL` para acessar o merchant-service. No ambiente local, o valor deve ser `http://localhost:8090`, já definido no `.env.example`.
@@ -68,8 +73,10 @@ O gateway usa `MERCHANT_SERVICE_URL` para acessar o merchant-service. No ambient
 | --- | ---: | --- |
 | payment-gateway-core | 8080 | `http://localhost:8080` |
 | merchant-service | 8090 | `http://localhost:8090` |
+| payment-authorization-service | 8100 | `http://localhost:8100` |
 | PostgreSQL do merchant-service | 5432 | `localhost:5432` |
 | PostgreSQL do payment-gateway-core | 5433 | `localhost:5433` |
+| PostgreSQL do payment-authorization-service | 5434 | `localhost:5434` |
 | RabbitMQ AMQP | 5672 | `localhost:5672` |
 | RabbitMQ Management | 15672 | `http://localhost:15672` |
 | Redis | 6380 | `localhost:6380` |
@@ -89,6 +96,7 @@ Rotas públicas documentadas:
 | --- | --- | --- | --- |
 | merchant-service | `PUT` | `/v1/admin/merchants/{merchantId}` | Solicita a atualização do status de um merchant. |
 | payment-gateway-core | `POST` | `/v1/payments` | Aceita uma intenção de pagamento de forma idempotente e retorna `202` durante o processamento. |
+| payment-gateway-core | `GET` | `/v1/payments/{paymentId}` | Consulta o estado assíncrono de um pagamento. |
 
 `GET /internal/v1/merchants/{merchantId}` é uma rota de comunicação entre serviços e permanece fora do Swagger público.
 

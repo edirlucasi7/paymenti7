@@ -15,10 +15,12 @@
 	<name>Paymenti7 Platform</name>
 	<properties>
 		<java.version>25</java.version>
+		<resilience4j.version>2.4.0</resilience4j.version>
 	</properties>
 	<modules>
 		<module>apps/merchant-service</module>
 		<module>apps/payment-gateway-core</module>
+		<module>apps/payment-authorization-service</module>
 		<module>libs/resilience</module>
 	</modules>
 

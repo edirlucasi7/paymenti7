@@ -77,7 +77,7 @@ public class PaymentOutboxEventPublisher {
 			String eventType, String occurredAt, Map<String, Object> payload) {
 
 		private static PaymentRequestedMessage from(PaymentOutboxEventEntity event) {
-			return new PaymentRequestedMessage(1, event.getId().toString(), event.getAggregateType(),
+			return new PaymentRequestedMessage(event.getSchemaVersion(), event.getId().toString(), event.getAggregateType(),
 					event.getAggregateId().toString(), event.getEventType(), event.getOccurredAt().toString(),
 					event.getPayload());
 		}
