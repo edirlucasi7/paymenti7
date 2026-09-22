@@ -124,6 +124,56 @@ class PaymentAuthorizationFlowIntegrationTest {
 		assertThat(outboxRepository.count()).isEqualTo(1);
 	}
 
+	@Test
+	void failsWhenSafeFallbackHasNoRemainingRoute() {
+		UUID paymentId = UUID.randomUUID();
+		inboxService.accept(message(UUID.randomUUID(), paymentId));
+		var attempt = stateService.prepareAttempt(paymentId, 0, "SIMULATOR_A").orElseThrow();
+
+		stateService.recordResult(paymentId, attempt.attemptId(),
+				new AcquirerResult(AuthorizationOutcome.SAFE_TO_FALLBACK, null, "UNAVAILABLE"), 1);
+
+		assertThat(jdbcTemplate.queryForObject(
+				"SELECT terminal_status FROM authorization_requests WHERE payment_id = ?", String.class, paymentId))
+				.isEqualTo("FAILED");
+		assertThat(jdbcTemplate.queryForObject(
+				"SELECT status FROM authorization_attempts WHERE payment_id = ?", String.class, paymentId))
+				.isEqualTo("SAFE_TO_FALLBACK");
+		assertThat(outboxRepository.count()).isEqualTo(1);
+	}
+
+	@Test
+	void skipsAnUnavailableRouteWithoutCreatingAnAttempt() {
+		UUID paymentId = UUID.randomUUID();
+		inboxService.accept(message(UUID.randomUUID(), paymentId));
+
+		stateService.skipUnavailableRoute(paymentId, 0, 2);
+
+		assertThat(jdbcTemplate.queryForObject(
+				"SELECT status FROM authorization_requests WHERE payment_id = ?", String.class, paymentId))
+				.isEqualTo("PENDING_ROUTING");
+		assertThat(jdbcTemplate.queryForObject(
+				"SELECT next_route_index FROM authorization_requests WHERE payment_id = ?", Integer.class, paymentId))
+				.isEqualTo(1);
+		assertThat(attemptRepository.count()).isZero();
+		assertThat(outboxRepository.count()).isZero();
+	}
+
+	@Test
+	void failsOnceWhenAllRoutesAreUnavailable() {
+		UUID paymentId = UUID.randomUUID();
+		inboxService.accept(message(UUID.randomUUID(), paymentId));
+
+		stateService.skipUnavailableRoute(paymentId, 0, 2);
+		stateService.skipUnavailableRoute(paymentId, 1, 2);
+
+		assertThat(jdbcTemplate.queryForObject(
+				"SELECT terminal_status FROM authorization_requests WHERE payment_id = ?", String.class, paymentId))
+				.isEqualTo("FAILED");
+		assertThat(attemptRepository.count()).isZero();
+		assertThat(outboxRepository.count()).isEqualTo(1);
+	}
+
 	private PaymentRequestedMessage message(UUID eventId, UUID paymentId) {
 		return new PaymentRequestedMessage(2, eventId, "PAYMENT", paymentId, "PaymentRequested", Instant.now(),
 				new PaymentRequestedMessage.Payload(paymentId, UUID.randomUUID(), new BigDecimal("125.90"),

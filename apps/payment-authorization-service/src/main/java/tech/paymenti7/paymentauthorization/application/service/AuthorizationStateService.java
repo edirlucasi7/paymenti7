@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import tech.paymenti7.paymentauthorization.application.domain.AttemptStatus;
+import tech.paymenti7.paymentauthorization.application.domain.AuthorizationDecision;
 import tech.paymenti7.paymentauthorization.application.domain.AuthorizationOutcome;
 import tech.paymenti7.paymentauthorization.application.domain.AuthorizationStatus;
 import tech.paymenti7.paymentauthorization.application.domain.PaymentTerminalStatus;
@@ -17,6 +18,7 @@ import tech.paymenti7.paymentauthorization.application.port.out.AcquirerAuthoriz
 import tech.paymenti7.paymentauthorization.application.port.out.AcquirerAuthorizationPort.AcquirerResult;
 import tech.paymenti7.paymentauthorization.infrastructure.persistence.entity.AuthorizationAttemptEntity;
 import tech.paymenti7.paymentauthorization.infrastructure.persistence.entity.AuthorizationOutboxEventEntity;
+import tech.paymenti7.paymentauthorization.infrastructure.persistence.entity.AuthorizationRequestEntity;
 import tech.paymenti7.paymentauthorization.infrastructure.persistence.repository.AuthorizationAttemptJpaRepository;
 import tech.paymenti7.paymentauthorization.infrastructure.persistence.repository.AuthorizationOutboxEventJpaRepository;
 import tech.paymenti7.paymentauthorization.infrastructure.persistence.repository.AuthorizationRequestJpaRepository;
@@ -52,8 +54,7 @@ public class AuthorizationStateService {
 	@Transactional
 	public Optional<PreparedAttempt> prepareAttempt(UUID paymentId, int expectedRouteIndex, String acquirer) {
 		var authorization = authorizationRepository.findByPaymentIdForUpdate(paymentId).orElseThrow();
-		if (authorization.getStatus() != AuthorizationStatus.PENDING_ROUTING
-				|| authorization.getNextRouteIndex() != expectedRouteIndex) {
+		if (!isExpectedPendingRoute(authorization, expectedRouteIndex)) {
 			return Optional.empty();
 		}
 		Instant now = Instant.now();
@@ -66,46 +67,27 @@ public class AuthorizationStateService {
 	}
 
 	@Transactional
-	public void skipSafeRoute(UUID paymentId, int expectedRouteIndex, int routeCount) {
+	public void skipUnavailableRoute(UUID paymentId, int expectedRouteIndex, int routeCount) {
 		var authorization = authorizationRepository.findByPaymentIdForUpdate(paymentId).orElseThrow();
-		if (authorization.getStatus() != AuthorizationStatus.PENDING_ROUTING
-				|| authorization.getNextRouteIndex() != expectedRouteIndex) {
+		if (!isExpectedPendingRoute(authorization, expectedRouteIndex)) {
 			return;
 		}
 		Instant now = Instant.now();
-		if (expectedRouteIndex + 1 >= routeCount) {
-			complete(authorization, PaymentTerminalStatus.FAILED, null, now);
-		}
-		else {
-			authorization.moveToNextRoute(now);
-		}
+		var decision = AuthorizationOutcome.SAFE_TO_FALLBACK.decide(hasNextRoute(expectedRouteIndex, routeCount));
+		applyDecision(authorization, null, decision, now);
 	}
 
 	@Transactional
 	public void recordResult(UUID paymentId, UUID attemptId, AcquirerResult result, int routeCount) {
 		var authorization = authorizationRepository.findByPaymentIdForUpdate(paymentId).orElseThrow();
 		var attempt = attemptRepository.findById(attemptId).orElseThrow();
-		if (authorization.getStatus() != AuthorizationStatus.CALL_IN_PROGRESS
-				|| attempt.getStatus() != AttemptStatus.DISPATCHING) {
+		if (!isActiveDispatch(authorization, attempt)) {
 			return;
 		}
 		Instant now = Instant.now();
 		attempt.complete(result, now);
-		if (result.outcome() == AuthorizationOutcome.APPROVED) {
-			complete(authorization, PaymentTerminalStatus.APPROVED, attempt, now);
-		}
-		else if (result.outcome() == AuthorizationOutcome.DECLINED) {
-			complete(authorization, PaymentTerminalStatus.DECLINED, attempt, now);
-		}
-		else if (result.outcome() == AuthorizationOutcome.UNKNOWN) {
-			authorization.pendingReconciliation(now);
-		}
-		else if (authorization.getNextRouteIndex() + 1 >= routeCount) {
-			complete(authorization, PaymentTerminalStatus.FAILED, attempt, now);
-		}
-		else {
-			authorization.moveToNextRoute(now);
-		}
+		var decision = result.outcome().decide(hasNextRoute(authorization.getNextRouteIndex(), routeCount));
+		applyDecision(authorization, attempt, decision, now);
 	}
 
 	@Transactional(readOnly = true)
@@ -125,7 +107,32 @@ public class AuthorizationStateService {
 		authorization.pendingReconciliation(now);
 	}
 
-	private void complete(tech.paymenti7.paymentauthorization.infrastructure.persistence.entity.AuthorizationRequestEntity authorization,
+	private boolean isExpectedPendingRoute(AuthorizationRequestEntity authorization, int expectedRouteIndex) {
+		return authorization.getStatus() == AuthorizationStatus.PENDING_ROUTING
+				&& authorization.getNextRouteIndex() == expectedRouteIndex;
+	}
+
+	private boolean isActiveDispatch(AuthorizationRequestEntity authorization, AuthorizationAttemptEntity attempt) {
+		return authorization.getStatus() == AuthorizationStatus.CALL_IN_PROGRESS
+				&& attempt.getStatus() == AttemptStatus.DISPATCHING;
+	}
+
+	private boolean hasNextRoute(int currentRouteIndex, int routeCount) {
+		return currentRouteIndex + 1 < routeCount;
+	}
+
+	private void applyDecision(AuthorizationRequestEntity authorization, AuthorizationAttemptEntity attempt,
+			AuthorizationDecision decision, Instant now) {
+		switch (decision) {
+			case COMPLETE_APPROVED -> complete(authorization, PaymentTerminalStatus.APPROVED, attempt, now);
+			case COMPLETE_DECLINED -> complete(authorization, PaymentTerminalStatus.DECLINED, attempt, now);
+			case CONTINUE_ROUTING -> authorization.moveToNextRoute(now);
+			case AWAIT_RECONCILIATION -> authorization.pendingReconciliation(now);
+			case COMPLETE_FAILED -> complete(authorization, PaymentTerminalStatus.FAILED, attempt, now);
+		}
+	}
+
+	private void complete(AuthorizationRequestEntity authorization,
 			PaymentTerminalStatus status, AuthorizationAttemptEntity attempt, Instant now) {
 		authorization.complete(status, now);
 		outboxRepository.save(AuthorizationOutboxEventEntity.completed(authorization.getPaymentId(), status, attempt, now));

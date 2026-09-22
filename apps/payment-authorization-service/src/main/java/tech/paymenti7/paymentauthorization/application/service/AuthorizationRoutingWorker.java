@@ -72,7 +72,7 @@ public class AuthorizationRoutingWorker {
 		var permit = breaker.tryAcquire(paymentId);
 		if (!permit.allowed()) {
 			counter("skipped", acquirer).increment();
-			stateService.skipSafeRoute(paymentId, route.routeIndex(), properties.acquirersOrder().size());
+			stateService.skipUnavailableRoute(paymentId, route.routeIndex(), properties.acquirersOrder().size());
 			return;
 		}
 
