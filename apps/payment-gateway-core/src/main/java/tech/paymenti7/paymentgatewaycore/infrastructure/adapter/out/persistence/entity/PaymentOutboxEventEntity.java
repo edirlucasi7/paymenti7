@@ -29,6 +29,9 @@ public class PaymentOutboxEventEntity {
 	@Column(name = "event_type", nullable = false, length = 100)
 	private String eventType;
 
+	@Column(name = "schema_version", nullable = false)
+	private int schemaVersion;
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(nullable = false, columnDefinition = "jsonb")
 	private Map<String, Object> payload;
@@ -46,17 +49,19 @@ public class PaymentOutboxEventEntity {
 	}
 
 	public static PaymentOutboxEventEntity requested(UUID eventId, UUID paymentId, UUID merchantId,
-			BigDecimal amount, String currency, Instant occurredAt) {
+			BigDecimal amount, String currency, String paymentMethodToken, Instant occurredAt) {
 		var entity = new PaymentOutboxEventEntity();
 		entity.id = eventId;
 		entity.aggregateType = "PAYMENT";
 		entity.aggregateId = paymentId;
 		entity.eventType = "PaymentRequested";
+		entity.schemaVersion = 2;
 		entity.payload = Map.of(
 				"paymentId", paymentId.toString(),
 				"merchantId", merchantId.toString(),
 				"amount", amount,
-				"currency", currency);
+				"currency", currency,
+				"paymentMethodToken", paymentMethodToken);
 		entity.occurredAt = occurredAt;
 		entity.deliveryStatus = "PENDING";
 		return entity;
@@ -76,6 +81,10 @@ public class PaymentOutboxEventEntity {
 
 	public String getEventType() {
 		return eventType;
+	}
+
+	public int getSchemaVersion() {
+		return schemaVersion;
 	}
 
 	public Map<String, Object> getPayload() {

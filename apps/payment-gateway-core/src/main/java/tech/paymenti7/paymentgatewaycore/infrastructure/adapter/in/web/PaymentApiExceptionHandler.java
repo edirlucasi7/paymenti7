@@ -9,9 +9,17 @@ import tech.paymenti7.paymentgatewaycore.application.shared.exception.MerchantNo
 import tech.paymenti7.paymentgatewaycore.application.shared.exception.MerchantServiceUnavailableException;
 import tech.paymenti7.paymentgatewaycore.application.shared.exception.IdempotencyConflictException;
 import tech.paymenti7.paymentgatewaycore.application.shared.exception.InactiveMerchantException;
+import tech.paymenti7.paymentgatewaycore.application.shared.exception.PaymentNotFoundException;
 
 @RestControllerAdvice
 public class PaymentApiExceptionHandler {
+
+	@ExceptionHandler(PaymentNotFoundException.class)
+	ProblemDetail handlePaymentNotFound(PaymentNotFoundException exception) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+		problem.setTitle("Payment not found");
+		return problem;
+	}
 
 	@ExceptionHandler(MerchantNotFoundException.class)
 	ProblemDetail handleMerchantNotFound(MerchantNotFoundException exception) {

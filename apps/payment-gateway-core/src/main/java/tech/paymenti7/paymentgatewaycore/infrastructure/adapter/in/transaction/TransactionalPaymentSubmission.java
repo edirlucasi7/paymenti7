@@ -44,7 +44,8 @@ public class TransactionalPaymentSubmission {
 	}
 
 	@Transactional
-	public SubmitPaymentResult submit(UUID merchantId, BigDecimal amount, String currency, UUID idempotencyKey,
+	public SubmitPaymentResult submit(UUID merchantId, BigDecimal amount, String currency, String paymentMethodToken,
+			UUID idempotencyKey,
 			String requestHash) {
 		Instant now = Instant.now();
 		UUID paymentId = UUID.randomUUID();
@@ -55,9 +56,9 @@ public class TransactionalPaymentSubmission {
 			return replay(merchantId, idempotencyKey, requestHash);
 		}
 
-		paymentRepository.save(PaymentEntity.processing(paymentId, merchantId, amount, currency, now));
+		paymentRepository.save(PaymentEntity.processing(paymentId, merchantId, amount, currency, paymentMethodToken, now));
 		outboxEventRepository.save(PaymentOutboxEventEntity.requested(UUID.randomUUID(), paymentId, merchantId, amount,
-				currency, now));
+				currency, paymentMethodToken, now));
 		return processing(paymentId);
 	}
 

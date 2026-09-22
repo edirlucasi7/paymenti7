@@ -33,7 +33,7 @@ public class SubmitPaymentService implements SubmitPaymentUseCase {
 		BigDecimal normalizedAmount = command.amount().stripTrailingZeros();
 		String normalizedCurrency = command.currency().toUpperCase(Locale.ROOT);
 		String requestHash = requestHash(command.merchantId().toString(), normalizedAmount.toPlainString(),
-				normalizedCurrency);
+				normalizedCurrency, command.paymentMethodToken());
 		var existing = transactionalPaymentSubmission.findExisting(command.merchantId(), command.idempotencyKey(), requestHash);
 		if (existing.isPresent()) {
 			return existing.get();
@@ -45,13 +45,14 @@ public class SubmitPaymentService implements SubmitPaymentUseCase {
 		}
 
 		return transactionalPaymentSubmission.submit(command.merchantId(), normalizedAmount, normalizedCurrency,
-				command.idempotencyKey(), requestHash);
+				command.paymentMethodToken(), command.idempotencyKey(), requestHash);
 	}
 
-	private String requestHash(String merchantId, String amount, String currency) {
+	private String requestHash(String merchantId, String amount, String currency, String paymentMethodToken) {
 		try {
 			var digest = MessageDigest.getInstance("SHA-256");
-			byte[] hash = digest.digest((merchantId + "\n" + amount + "\n" + currency).getBytes(StandardCharsets.UTF_8));
+			byte[] hash = digest.digest((merchantId + "\n" + amount + "\n" + currency + "\n" + paymentMethodToken)
+					.getBytes(StandardCharsets.UTF_8));
 			return HexFormat.of().formatHex(hash);
 		}
 		catch (NoSuchAlgorithmException exception) {

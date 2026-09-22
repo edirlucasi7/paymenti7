@@ -12,7 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Map;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -49,7 +49,9 @@ import tech.paymenti7.paymentgatewaycore.application.shared.exception.Idempotenc
 import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.persistence.repository.IdempotencyRequestJpaRepository;
 import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.persistence.repository.PaymentJpaRepository;
 import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.persistence.repository.PaymentOutboxEventJpaRepository;
+import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.persistence.repository.AuthorizationResultInboxJpaRepository;
 import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.out.publisher.PaymentRabbitMqConfiguration;
+import tech.paymenti7.paymentgatewaycore.infrastructure.adapter.in.messaging.PaymentAuthorizationCompletedMessage;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
 		"payment.gateway.outbox.polling-delay=1h",
@@ -104,6 +106,12 @@ class PaymentIdempotencyIntegrationTest {
 	private PaymentOutboxEventJpaRepository outboxEventRepository;
 
 	@Autowired
+	private AuthorizationResultInboxJpaRepository authorizationResultInboxRepository;
+
+	@Autowired
+	private TransactionalAuthorizationResultProcessor authorizationResultProcessor;
+
+	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
 	@Autowired
@@ -114,6 +122,7 @@ class PaymentIdempotencyIntegrationTest {
 
 	@BeforeEach
 	void cleanDatabaseAndActivateMerchants() {
+		authorizationResultInboxRepository.deleteAll();
 		outboxEventRepository.deleteAll();
 		idempotencyRequestRepository.deleteAll();
 		paymentRepository.deleteAll();
@@ -151,7 +160,7 @@ class PaymentIdempotencyIntegrationTest {
 	void requiresTheHeaderAndExposesTheAcceptedResponseOverHttp() throws Exception {
 		UUID merchantId = UUID.randomUUID();
 		String body = """
-				{"merchantId":"%s","amount":125.90,"currency":"BRL"}
+				{"merchantId":"%s","amount":125.90,"currency":"BRL","paymentMethodToken":"pmt_test_token"}
 				""".formatted(merchantId);
 		var missingKey = postPayment(body, null);
 		UUID idempotencyKey = UUID.randomUUID();
@@ -171,6 +180,42 @@ class PaymentIdempotencyIntegrationTest {
 		assertThatThrownBy(() -> submitPaymentUseCase.submit(command(merchantId, idempotencyKey, "11.00")))
 				.isInstanceOf(IdempotencyConflictException.class);
 		assertThat(paymentRepository.count()).isEqualTo(1);
+	}
+
+	@Test
+	void rejectsTheSameKeyWhenOnlyThePaymentTokenChanges() {
+		UUID merchantId = UUID.randomUUID();
+		UUID idempotencyKey = UUID.randomUUID();
+		submitPaymentUseCase.submit(command(merchantId, idempotencyKey, "10.00"));
+		var changedToken = new SubmitPaymentCommand(merchantId, new BigDecimal("10.00"), "BRL",
+				"pmt_different_token", idempotencyKey);
+
+		assertThatThrownBy(() -> submitPaymentUseCase.submit(changedToken))
+				.isInstanceOf(IdempotencyConflictException.class);
+	}
+
+	@Test
+	void consumesAuthorizationResultIdempotentlyAndExposesItThroughGet() throws Exception {
+		var command = command(UUID.randomUUID(), UUID.randomUUID(), "55.00");
+		var submitted = submitPaymentUseCase.submit(command);
+		UUID eventId = UUID.randomUUID();
+		var message = new PaymentAuthorizationCompletedMessage(1, eventId, "PAYMENT", submitted.paymentId(),
+				"PaymentAuthorizationCompleted", Instant.now(),
+				new PaymentAuthorizationCompletedMessage.Payload(submitted.paymentId(), PaymentStatus.APPROVED,
+						"SIMULATOR_A", UUID.randomUUID(), "provider-ref", "APPROVED"));
+
+		assertThat(authorizationResultProcessor.process(message)).isTrue();
+		assertThat(authorizationResultProcessor.process(message)).isFalse();
+		var queried = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+				URI.create("http://localhost:" + port + "/v1/payments/" + submitted.paymentId())).GET().build(),
+				HttpResponse.BodyHandlers.ofString());
+		var replayed = submitPaymentUseCase.submit(command);
+
+		assertThat(queried.statusCode()).isEqualTo(200);
+		assertThat(queried.body()).contains("APPROVED");
+		assertThat(replayed.httpStatus()).isEqualTo(200);
+		assertThat(replayed.status()).isEqualTo(PaymentStatus.APPROVED);
+		assertThat(authorizationResultInboxRepository.count()).isEqualTo(1);
 	}
 
 	@Test
@@ -199,9 +244,7 @@ class PaymentIdempotencyIntegrationTest {
 		var processingCommand = command(UUID.randomUUID(), UUID.randomUUID(), "40.00");
 		var terminal = submitPaymentUseCase.submit(terminalCommand);
 		var processing = submitPaymentUseCase.submit(processingCommand);
-		completePaymentUseCase.complete(new CompletePaymentCommand(terminal.paymentId(), PaymentStatus.APPROVED, 200,
-				Map.of("paymentId", terminal.paymentId().toString(), "status", "APPROVED"),
-				Map.of("Payment-Result", "replayed")));
+		completePaymentUseCase.complete(new CompletePaymentCommand(terminal.paymentId(), PaymentStatus.APPROVED));
 		jdbcTemplate.update("""
 				UPDATE idempotency_requests
 				SET completed_at = CURRENT_TIMESTAMP - INTERVAL '25 hours',
@@ -216,7 +259,7 @@ class PaymentIdempotencyIntegrationTest {
 		assertThat(replayed.status()).isEqualTo(PaymentStatus.APPROVED);
 		assertThat(replayed.httpStatus()).isEqualTo(200);
 		assertThat(replayed.responseBody()).containsEntry("status", "APPROVED");
-		assertThat(replayed.responseHeaders()).containsEntry("Payment-Result", "replayed");
+		assertThat(replayed.responseHeaders()).isEmpty();
 		assertThat(deleted).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForObject(
 				"SELECT count(*) FROM idempotency_requests WHERE payment_id = ? AND status = 'PROCESSING'",
@@ -233,7 +276,7 @@ class PaymentIdempotencyIntegrationTest {
 	}
 
 	private SubmitPaymentCommand command(UUID merchantId, UUID idempotencyKey, String amount) {
-		return new SubmitPaymentCommand(merchantId, new BigDecimal(amount), "BRL", idempotencyKey);
+		return new SubmitPaymentCommand(merchantId, new BigDecimal(amount), "BRL", "pmt_test_token", idempotencyKey);
 	}
 
 	private HttpResponse<String> postPayment(String body, UUID idempotencyKey) throws Exception {

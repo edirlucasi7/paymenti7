@@ -2,8 +2,10 @@ package tech.paymenti7.paymentgatewaycore.infrastructure.adapter.in.transaction;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +49,13 @@ public class TransactionalCompletePaymentUseCase implements CompletePaymentUseCa
 		var payment = paymentRepository.findById(command.paymentId())
 				.orElseThrow(() -> new IllegalArgumentException("Payment not found: " + command.paymentId()));
 		payment.complete(command.status(), completedAt);
-		idempotencyRequest.complete(command.status(), command.httpStatus(), command.responseBody(), command.responseHeaders(), completedAt,
+		int httpStatus = command.status() == PaymentStatus.FAILED
+				? HttpStatus.BAD_GATEWAY.value()
+				: HttpStatus.OK.value();
+		var responseBody = Map.<String, Object>of(
+				"paymentId", command.paymentId().toString(),
+				"status", command.status().name());
+		idempotencyRequest.complete(command.status(), httpStatus, responseBody, Map.of(), completedAt,
 				completedAt.plus(retention));
 	}
 }

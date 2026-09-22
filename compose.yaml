@@ -31,6 +31,22 @@ services:
       timeout: 5s
       retries: 10
 
+  authorization-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${AUTHORIZATION_POSTGRES_DB:-paymenti7_authorization}
+      POSTGRES_USER: ${AUTHORIZATION_POSTGRES_USER:-paymenti7}
+      POSTGRES_PASSWORD: ${AUTHORIZATION_POSTGRES_PASSWORD:-paymenti7}
+    ports:
+      - "${AUTHORIZATION_POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - payment-authorization-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   rabbitmq:
     image: rabbitmq:4.3.5-management-alpine
     environment:
@@ -63,5 +79,6 @@ services:
 volumes:
   merchant-postgres-data:
   payment-gateway-postgres-data:
+  payment-authorization-postgres-data:
   merchant-rabbitmq-data:
   payment-gateway-redis-data:
